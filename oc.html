@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OC生成器</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 2em;
+      transition: background-color 0.5s;
+    }
+    .container {
+      background: white;
+      padding: 2em;
+      border-radius: 1em;
+      max-width: 800px;
+      margin: auto;
+    }
+    .watermark {
+      font-size: 0.8em;
+      color: #888;
+      float: left;
+      margin-right: 0.5em;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.5em;
+      margin-bottom: 1em;
+      border-radius: 0.5em;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 0.7em 1.5em;
+      border: none;
+      border-radius: 0.5em;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    canvas {
+      display: block;
+      margin: 1em auto;
+      background: #fff;
+      border-radius: 1em;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div><span class="watermark">xzgh</span><h2>OC生成器</h2></div>
+    <label>角色名字：<input type="text" id="name" placeholder="xzgh" /></label>
+    <label>性别：
+      <select id="gender">
+        <option>男凉</option>
+        <option>男</option>
+        <option>女</option>
+        <option>不明</option>
+        <option>自定义</option>
+      </select>
+    </label>
+    <label>年龄（岁）：<input type="number" id="age" min="1" max="999" /></label>
+    <label>身高（cm）：<input type="number" id="height" /></label>
+    <label>发色：<input type="text" id="hair" /></label>
+    <label>瞳色（支持异色）：<input type="text" id="eyes" /></label>
+    <label>外貌特征：<input type="text" id="features" /></label>
+    <label>穿着风格与配饰：<input type="text" id="clothes" /></label>
+    <label>阵营/所属团体：<input type="text" id="camp" /></label>
+    <label>主要武器：<input type="text" id="weapon" /></label>
+    <label>脉原属性类型：<input type="text" id="source" /></label>
+    <label>脉原等级（0~6 或特殊状态）：<input type="text" id="sourceLevel" /></label>
+    <label>脉原技能简述：<textarea id="sourceSkill" rows="3"></textarea></label>
+    <label>特殊设定与背景故事：<textarea id="special" rows="3"></textarea></label>
+
+    <h3>🧭 五维属性评分（0~100）</h3>
+    <label>力量 Strength：<input type="number" id="str" min="0" max="100" /></label>
+    <label>敏捷 Agility：<input type="number" id="agi" min="0" max="100" /></label>
+    <label>智力 Intelligence：<input type="number" id="int" min="0" max="100" /></label>
+    <label>感知 Perception：<input type="number" id="per" min="0" max="100" /></label>
+    <label>魅力 Charisma：<input type="number" id="cha" min="0" max="100" /></label>
+
+    <h3>⚔️ 科系选择</h3>
+    <select id="kinds">
+      <option>器术科</option>
+      <option>幻术科</option>
+      <option>卷轴科</option>
+      <option>体术科</option>
+    </select>
+
+    <h3>💉 当前状态</h3>
+    <select id="status">
+      <option>健康</option>
+      <option>轻伤</option>
+      <option>受伤</option>
+      <option>濒危</option>
+      <option>死亡</option>
+      <option>赛博飞升</option>
+    </select>
+
+    <button onclick="generateOC()">生成角色描述 + 属性图</button>
+
+    <h3>📝 自动生成的角色描述：</h3>
+    <pre id="output"></pre>
+
+    <canvas id="radar" width="400" height="400"></canvas>
+  </div>
+
+  <script>
+    function switchToJapanese() {
+      document.querySelector('h2').textContent = 'OCジェネレーター';
+      document.querySelectorAll('h3')[1].textContent = '📝 自動生成されたキャラクター説明：';
+      const status = document.getElementById('status');
+      status.options[0].text = '健康';
+      status.options[1].text = '軽傷';
+      status.options[2].text = '負傷';
+      status.options[3].text = '瀕死';
+      status.options[4].text = '死亡';
+      status.options[5].text = 'サイバー昇華';
+    }
+
+    function switchToChinese() {
+      document.querySelector('h2').textContent = 'OC生成器';
+      document.querySelectorAll('h3')[1].textContent = '📝 自动生成的角色描述：';
+      const status = document.getElementById('status');
+      status.options[0].text = '健康';
+      status.options[1].text = '轻伤';
+      status.options[2].text = '受伤';
+      status.options[3].text = '濒危';
+      status.options[4].text = '死亡';
+      status.options[5].text = '赛博飞升';
+    }
+
+    function drawRadar(str, agi, intt, per, cha) {
+      const canvas = document.getElementById('radar');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const maxRadius = Math.min(centerX, centerY) * 0.8;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const attrs = [
+        { name: '力量', value: str },
+        { name: '敏捷', value: agi },
+        { name: '智力', value: intt },
+        { name: '感知', value: per },
+        { name: '魅力', value: cha }
+      ];
+
+      const sides = attrs.length;
+      const angleStep = (2 * Math.PI) / sides;
+
+      ctx.strokeStyle = '#aaa';
+      ctx.lineWidth = 1;
+
+      // 画蜘蛛网格层（5层）
+      for (let layer = 1; layer <= 5; layer++) {
+        let r = (maxRadius / 5) * layer;
+        ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+          let angle = i * angleStep - Math.PI / 2;
+          let x = centerX + r * Math.cos(angle);
+          let y = centerY + r * Math.sin(angle);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      // 画从中心到各顶点的轴线
+      for (let i = 0; i < sides; i++) {
+        let angle = i * angleStep - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(
+          centerX + maxRadius * Math.cos(angle),
+          centerY + maxRadius * Math.sin(angle)
+        );
+        ctx.stroke();
+      }
+
+      // 画属性点并连接成网状
+      ctx.strokeStyle = '#007bff';
+      ctx.fillStyle = '#007bff';
+      ctx.lineWidth = 2;
+
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        let angle = i * angleStep - Math.PI / 2;
+        let r = (attrs[i].value / 100) * maxRadius;
+        let x = centerX + r * Math.cos(angle);
+        let y = centerY + r * Math.sin(angle);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+
+        // 画小圆点
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // 画属性名
+      ctx.fillStyle = '#000';
+      ctx.font = '14px sans-serif';
+      for (let i = 0; i < sides; i++) {
+        let angle = i * angleStep - Math.PI / 2;
+        let x = centerX + (maxRadius + 20) * Math.cos(angle);
+        let y = centerY + (maxRadius + 20) * Math.sin(angle);
+        ctx.textAlign = x < centerX ? 'right' : 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(attrs[i].name, x, y);
+      }
+    }
+
+    function generateOC() {
+      const name = document.getElementById('name').value.trim();
+      const eyes = document.getElementById('eyes').value.trim();
+      const status = document.getElementById('status');
+      const height = parseInt(document.getElementById('height').value) || 0;
+
+      // 预先初始化extramsg
+      let extramsg = '';
+
+      // 特殊处理彩蛋和状态
+      if (name === '孙笑川') {
+        status.value = '死亡';
+        switchToJapanese();
+      } else {
+        switchToChinese();
+      }
+
+      if (name.toLowerCase() === 'mikasa') {
+        alert('你在打什么主意？');
+      } else if (name === '艾伦') {
+        extramsg = '机油哒';
+      } else if (name === 'xzgh') {
+        extramsg = '你药干嘛？？？';
+      }
+
+      let str = parseInt(document.getElementById('str').value) || 0;
+      let agi = parseInt(document.getElementById('agi').value) || 0;
+      let intt = parseInt(document.getElementById('int').value) || 0;
+      let per = parseInt(document.getElementById('per').value) || 0;
+      let cha = parseInt(document.getElementById('cha').value) || 0;
+
+      if (str >= 100 && agi >= 100 && intt >= 100 && per >= 100 && cha >= 100) {
+        extramsg = '我不当人啦，jojo！！！';
+      }
+
+      // 身高彩蛋
+      if (height > 500) {
+        extramsg += (extramsg ? '\n' : '') + '那一天人类又想起了被巨人支配的恐惧';
+      }
+
+      // 瞳色彩蛋：红色深红背景
+      if (eyes.includes('红')) {
+        document.body.style.backgroundColor = '#8B0000'; // 深红色
+      } else {
+        document.body.style.backgroundColor = '#f4f4f4'; // 恢复默认
+      }
+
+      const result = 
+`角色名：${name}
+性别：${document.getElementById('gender').value}
+年龄：${document.getElementById('age').value}
+身高：${height} cm
+发色：${document.getElementById('hair').value}
+瞳色：${eyes}
+外貌特征：${document.getElementById('features').value}
+穿着风格与配饰：${document.getElementById('clothes').value}
+阵营/所属团体：${document.getElementById('camp').value}
+主要武器：${document.getElementById('weapon').value}
+脉原属性类型：${document.getElementById('source').value}
+脉原等级：${document.getElementById('sourceLevel').value}
+脉原技能简述：
+${document.getElementById('sourceSkill').value}
+特殊设定与背景故事：
+${document.getElementById('special').value}
+
+五维属性评分：
+力量 (STR): ${str}
+敏捷 (AGI): ${agi}
+智力 (INT): ${intt}
+感知 (PER): ${per}
+魅力 (CHA): ${cha}
+
+当前状态：${status.value}
+
+${extramsg}`;
+
+      document.getElementById('output').textContent = result;
+
+      drawRadar(str, agi, intt, per, cha);
+    }
+  </script>
+</body>
+</html>
